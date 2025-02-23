@@ -16,28 +16,38 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { LockIcon, UnlockIcon, CopyIcon, ShieldIcon, Trash2Icon } from "lucide-react";
-import { encryptText, decryptText } from "@/lib/encryption";
+import { encryptText, decryptText, encryptionMethods } from "@/lib/encryption";
 
 const encryptSchema = z.object({
   text: z.string().min(1, "Text is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  method: z.enum(['AES', 'Triple DES', 'RC4']).default('AES'),
 });
 
 const decryptSchema = z.object({
   encryptedText: z.string().min(1, "Encrypted text is required"),
   password: z.string().min(1, "Password is required"),
+  method: z.enum(['AES', 'Triple DES', 'RC4']).default('AES'),
 });
 
 export default function Home() {
   const { toast } = useToast();
   const [result, setResult] = useState("");
-  
+
   const encryptForm = useForm<z.infer<typeof encryptSchema>>({
     resolver: zodResolver(encryptSchema),
     defaultValues: {
       text: "",
       password: "",
+      method: "AES",
     },
   });
 
@@ -46,16 +56,17 @@ export default function Home() {
     defaultValues: {
       encryptedText: "",
       password: "",
+      method: "AES",
     },
   });
 
   const onEncrypt = (values: z.infer<typeof encryptSchema>) => {
     try {
-      const encrypted = encryptText(values.text, values.password);
+      const encrypted = encryptText(values.text, values.password, values.method);
       setResult(encrypted);
       toast({
         title: "Text encrypted successfully!",
-        description: "You can now copy and share the encrypted text.",
+        description: `Encrypted using ${values.method}. You can now copy and share the encrypted text.`,
       });
     } catch (error) {
       toast({
@@ -68,7 +79,7 @@ export default function Home() {
 
   const onDecrypt = (values: z.infer<typeof decryptSchema>) => {
     try {
-      const decrypted = decryptText(values.encryptedText, values.password);
+      const decrypted = decryptText(values.encryptedText, values.password, values.method);
       setResult(decrypted);
       toast({
         title: "Text decrypted successfully!",
@@ -105,7 +116,7 @@ export default function Home() {
             RemanCrypt
           </h1>
           <p className="text-muted-foreground">
-            Secure text encryption for the digital age
+            Advanced text encryption for the digital age
           </p>
         </div>
 
@@ -132,6 +143,33 @@ export default function Home() {
               <TabsContent value="encrypt">
                 <Form {...encryptForm}>
                   <form onSubmit={encryptForm.handleSubmit(onEncrypt)} className="space-y-4">
+                    <FormField
+                      control={encryptForm.control}
+                      name="method"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Encryption Method</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select encryption method" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {encryptionMethods.map((method) => (
+                                <SelectItem key={method} value={method}>
+                                  {method}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={encryptForm.control}
                       name="text"
@@ -177,6 +215,33 @@ export default function Home() {
               <TabsContent value="decrypt">
                 <Form {...decryptForm}>
                   <form onSubmit={decryptForm.handleSubmit(onDecrypt)} className="space-y-4">
+                    <FormField
+                      control={decryptForm.control}
+                      name="method"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Decryption Method</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select decryption method" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {encryptionMethods.map((method) => (
+                                <SelectItem key={method} value={method}>
+                                  {method}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={decryptForm.control}
                       name="encryptedText"
