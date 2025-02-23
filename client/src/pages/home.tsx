@@ -24,18 +24,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LockIcon, UnlockIcon, CopyIcon, ShieldIcon, Trash2Icon } from "lucide-react";
-import { encryptText, decryptText, encryptionMethods } from "@/lib/encryption";
+import { encryptText, decryptText, encryptionMethods, keySizes } from "@/lib/encryption";
+import type { EncryptionMethod, KeySize } from "@/lib/encryption";
 
 const encryptSchema = z.object({
   text: z.string().min(1, "Text is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  method: z.enum(['AES', 'Triple DES', 'RC4']).default('AES'),
+  method: z.enum(['AES', 'Triple DES', 'RC4'] as const).default('AES'),
+  keySize: z.enum(['128', '192', '256'] as const).default('256'),
 });
 
 const decryptSchema = z.object({
   encryptedText: z.string().min(1, "Encrypted text is required"),
   password: z.string().min(1, "Password is required"),
-  method: z.enum(['AES', 'Triple DES', 'RC4']).default('AES'),
+  method: z.enum(['AES', 'Triple DES', 'RC4'] as const).default('AES'),
+  keySize: z.enum(['128', '192', '256'] as const).default('256'),
 });
 
 export default function Home() {
@@ -48,6 +51,7 @@ export default function Home() {
       text: "",
       password: "",
       method: "AES",
+      keySize: "256",
     },
   });
 
@@ -57,16 +61,20 @@ export default function Home() {
       encryptedText: "",
       password: "",
       method: "AES",
+      keySize: "256",
     },
   });
 
   const onEncrypt = (values: z.infer<typeof encryptSchema>) => {
     try {
-      const encrypted = encryptText(values.text, values.password, values.method);
+      const encrypted = encryptText(values.text, values.password, {
+        method: values.method as EncryptionMethod,
+        keySize: values.keySize as KeySize,
+      });
       setResult(encrypted);
       toast({
         title: "Text encrypted successfully!",
-        description: `Encrypted using ${values.method}. You can now copy and share the encrypted text.`,
+        description: `Encrypted using ${values.method} (${values.keySize}-bit). You can now copy and share the encrypted text.`,
       });
     } catch (error) {
       toast({
@@ -79,7 +87,10 @@ export default function Home() {
 
   const onDecrypt = (values: z.infer<typeof decryptSchema>) => {
     try {
-      const decrypted = decryptText(values.encryptedText, values.password, values.method);
+      const decrypted = decryptText(values.encryptedText, values.password, {
+        method: values.method as EncryptionMethod,
+        keySize: values.keySize as KeySize,
+      });
       setResult(decrypted);
       toast({
         title: "Text decrypted successfully!",
@@ -143,33 +154,62 @@ export default function Home() {
               <TabsContent value="encrypt">
                 <Form {...encryptForm}>
                   <form onSubmit={encryptForm.handleSubmit(onEncrypt)} className="space-y-4">
-                    <FormField
-                      control={encryptForm.control}
-                      name="method"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Encryption Method</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select encryption method" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {encryptionMethods.map((method) => (
-                                <SelectItem key={method} value={method}>
-                                  {method}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={encryptForm.control}
+                        name="method"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Encryption Method</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select encryption method" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {encryptionMethods.map((method) => (
+                                  <SelectItem key={method} value={method}>
+                                    {method}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={encryptForm.control}
+                        name="keySize"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Key Size (bits)</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select key size" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {keySizes.map((size) => (
+                                  <SelectItem key={size} value={size}>
+                                    {size} bits
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <FormField
                       control={encryptForm.control}
                       name="text"
@@ -215,33 +255,62 @@ export default function Home() {
               <TabsContent value="decrypt">
                 <Form {...decryptForm}>
                   <form onSubmit={decryptForm.handleSubmit(onDecrypt)} className="space-y-4">
-                    <FormField
-                      control={decryptForm.control}
-                      name="method"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Decryption Method</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select decryption method" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {encryptionMethods.map((method) => (
-                                <SelectItem key={method} value={method}>
-                                  {method}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={decryptForm.control}
+                        name="method"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Decryption Method</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select decryption method" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {encryptionMethods.map((method) => (
+                                  <SelectItem key={method} value={method}>
+                                    {method}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={decryptForm.control}
+                        name="keySize"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Key Size (bits)</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select key size" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {keySizes.map((size) => (
+                                  <SelectItem key={size} value={size}>
+                                    {size} bits
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <FormField
                       control={decryptForm.control}
                       name="encryptedText"

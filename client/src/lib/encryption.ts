@@ -1,16 +1,38 @@
 import CryptoJS from 'crypto-js';
 
-type EncryptionMethod = 'AES' | 'Triple DES' | 'RC4';
+export type EncryptionMethod = 'AES' | 'Triple DES' | 'RC4';
+export type KeySize = '128' | '192' | '256';
 
-export function encryptText(text: string, password: string, method: EncryptionMethod = 'AES'): string {
+interface EncryptionConfig {
+  method: EncryptionMethod;
+  keySize: KeySize;
+}
+
+function deriveKey(password: string, keySize: KeySize): CryptoJS.lib.WordArray {
+  // PBKDF2 for key derivation with 1000 iterations
+  return CryptoJS.PBKDF2(password, CryptoJS.lib.WordArray.random(128/8), {
+    keySize: parseInt(keySize) / 32, // Convert bits to words
+    iterations: 1000
+  });
+}
+
+export function encryptText(text: string, password: string, config: EncryptionConfig): string {
   try {
-    switch (method) {
+    const key = deriveKey(password, config.keySize);
+
+    switch (config.method) {
       case 'AES':
-        return CryptoJS.AES.encrypt(text, password).toString();
+        return CryptoJS.AES.encrypt(text, key, {
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7,
+        }).toString();
       case 'Triple DES':
-        return CryptoJS.TripleDES.encrypt(text, password).toString();
+        return CryptoJS.TripleDES.encrypt(text, key, {
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7,
+        }).toString();
       case 'RC4':
-        return CryptoJS.RC4.encrypt(text, password).toString();
+        return CryptoJS.RC4.encrypt(text, key).toString();
       default:
         throw new Error('Unsupported encryption method');
     }
@@ -19,18 +41,26 @@ export function encryptText(text: string, password: string, method: EncryptionMe
   }
 }
 
-export function decryptText(encryptedText: string, password: string, method: EncryptionMethod = 'AES'): string {
+export function decryptText(encryptedText: string, password: string, config: EncryptionConfig): string {
   try {
+    const key = deriveKey(password, config.keySize);
     let bytes;
-    switch (method) {
+
+    switch (config.method) {
       case 'AES':
-        bytes = CryptoJS.AES.decrypt(encryptedText, password);
+        bytes = CryptoJS.AES.decrypt(encryptedText, key, {
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7,
+        });
         break;
       case 'Triple DES':
-        bytes = CryptoJS.TripleDES.decrypt(encryptedText, password);
+        bytes = CryptoJS.TripleDES.decrypt(encryptedText, key, {
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7,
+        });
         break;
       case 'RC4':
-        bytes = CryptoJS.RC4.decrypt(encryptedText, password);
+        bytes = CryptoJS.RC4.decrypt(encryptedText, key);
         break;
       default:
         throw new Error('Unsupported encryption method');
@@ -48,3 +78,4 @@ export function decryptText(encryptedText: string, password: string, method: Enc
 }
 
 export const encryptionMethods: EncryptionMethod[] = ['AES', 'Triple DES', 'RC4'];
+export const keySizes: KeySize[] = ['128', '192', '256'];
