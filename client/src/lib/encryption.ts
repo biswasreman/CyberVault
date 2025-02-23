@@ -8,71 +8,102 @@ interface EncryptionConfig {
   keySize: KeySize;
 }
 
-function deriveKey(password: string, keySize: KeySize): CryptoJS.lib.WordArray {
-  // PBKDF2 for key derivation with 1000 iterations
-  return CryptoJS.PBKDF2(password, CryptoJS.lib.WordArray.random(128/8), {
+function deriveKey(password: string, keySize: KeySize): { key: CryptoJS.lib.WordArray; salt: CryptoJS.lib.WordArray } {
+  // Generate a random salt
+  const salt = CryptoJS.lib.WordArray.random(16);
+
+  // Derive key using PBKDF2
+  const key = CryptoJS.PBKDF2(password, salt, {
     keySize: parseInt(keySize) / 32, // Convert bits to words
     iterations: 1000
   });
+
+  return { key, salt };
 }
 
 export function encryptText(text: string, password: string, config: EncryptionConfig): string {
   try {
-    const key = deriveKey(password, config.keySize);
+    // Derive key and get salt
+    const { key, salt } = deriveKey(password, config.keySize);
+    let encrypted;
+
+    // Common encryption options
+    const options = {
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7,
+      iv: CryptoJS.lib.WordArray.random(16)
+    };
 
     switch (config.method) {
       case 'AES':
-        return CryptoJS.AES.encrypt(text, key, {
-          mode: CryptoJS.mode.CBC,
-          padding: CryptoJS.pad.Pkcs7,
-        }).toString();
+        encrypted = CryptoJS.AES.encrypt(text, key, options);
+        break;
       case 'Triple DES':
-        return CryptoJS.TripleDES.encrypt(text, key, {
-          mode: CryptoJS.mode.CBC,
-          padding: CryptoJS.pad.Pkcs7,
-        }).toString();
+        encrypted = CryptoJS.TripleDES.encrypt(text, key, options);
+        break;
       case 'RC4':
-        return CryptoJS.RC4.encrypt(text, key).toString();
+        encrypted = CryptoJS.RC4.encrypt(text, key);
+        break;
       default:
         throw new Error('Unsupported encryption method');
     }
+
+    // Combine salt, IV and ciphertext
+    const combined = salt.toString() + options.iv.toString() + encrypted.toString();
+    return combined;
+
   } catch (error) {
+    console.error('Encryption error:', error);
     throw new Error('Encryption failed. Please try again.');
   }
 }
 
 export function decryptText(encryptedText: string, password: string, config: EncryptionConfig): string {
   try {
-    const key = deriveKey(password, config.keySize);
-    let bytes;
+    // Extract salt, IV and ciphertext
+    const saltSize = 32; // 16 bytes = 32 hex characters
+    const ivSize = 32; // 16 bytes = 32 hex characters
+
+    const salt = CryptoJS.enc.Hex.parse(encryptedText.slice(0, saltSize));
+    const iv = CryptoJS.enc.Hex.parse(encryptedText.slice(saltSize, saltSize + ivSize));
+    const ciphertext = encryptedText.slice(saltSize + ivSize);
+
+    // Derive the same key using the extracted salt
+    const key = CryptoJS.PBKDF2(password, salt, {
+      keySize: parseInt(config.keySize) / 32,
+      iterations: 1000
+    });
+
+    let decrypted;
+    const options = {
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7,
+      iv: iv
+    };
 
     switch (config.method) {
       case 'AES':
-        bytes = CryptoJS.AES.decrypt(encryptedText, key, {
-          mode: CryptoJS.mode.CBC,
-          padding: CryptoJS.pad.Pkcs7,
-        });
+        decrypted = CryptoJS.AES.decrypt(ciphertext, key, options);
         break;
       case 'Triple DES':
-        bytes = CryptoJS.TripleDES.decrypt(encryptedText, key, {
-          mode: CryptoJS.mode.CBC,
-          padding: CryptoJS.pad.Pkcs7,
-        });
+        decrypted = CryptoJS.TripleDES.decrypt(ciphertext, key, options);
         break;
       case 'RC4':
-        bytes = CryptoJS.RC4.decrypt(encryptedText, key);
+        decrypted = CryptoJS.RC4.decrypt(ciphertext, key);
         break;
       default:
         throw new Error('Unsupported encryption method');
     }
 
-    const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
+    const decryptedText = decrypted.toString(CryptoJS.enc.Utf8);
     if (!decryptedText) {
       throw new Error('Invalid password or corrupted text.');
     }
 
     return decryptedText;
+
   } catch (error) {
+    console.error('Decryption error:', error);
     throw new Error('Decryption failed. Please check your password and try again.');
   }
 }
