@@ -379,7 +379,7 @@ export default function Home() {
             RemanCrypt™ - Licensed by Reman Biswas
           </p>
           <p className="mt-1">
-            Contact: <a href="mailto:support@reman.online" className="text-blue-400 hover:text-blue-300">
+            Contact: <a href="mailto:biswas@reman.online" className="text-blue-400 hover:text-blue-300">
               support@reman.online
             </a>
           </p>
